@@ -1,0 +1,13 @@
+Source: lmplayer
+Section: python 
+Priority: optional
+Maintainer: Mahdi Bahmani <itstorage59@gmail.com>
+Standards-Version: 4.3.0
+Build-Depends: debhelper (>=11~), dh-python, python3-all
+Homepage: https://www.itstorage.netsourcedir
+
+Package: lmplayer
+Architecture: all
+Section: python
+Depends: ${python3:Depends}, ${python-gi-dev:Depends}, ${python3-eyed3:Depends}, ${eyed3:Depends}, ${python3-all:Depends}
+Description: lmplayer Python GTK Media Player

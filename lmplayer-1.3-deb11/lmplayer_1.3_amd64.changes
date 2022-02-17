@@ -1,0 +1,25 @@
+Format: 1.8
+Date: Mon, 23 Aug 2021 13:12:45 +0430
+Source: lmplayer
+Binary: lmplayer
+Architecture: all
+Version: 1.3
+Distribution: UNRELEASED
+Urgency: medium
+Maintainer: Mahdi Bahmani <itstorage59@gmail.com>
+Changed-By: Mahdi Bahmani <itstorage59@gmail.com>
+Description:
+ lmplayer   - lmplayer Python GTK Media Player
+Changes:
+ lmplayer (1.3) UNRELEASED; urgency=medium
+ .
+   * Initial release. (Closes: #XXXXXX)
+Checksums-Sha1:
+ b681682874f1fcf712ec63955bb5f6938a5585a3 20540 lmplayer_1.3_all.deb
+ 2206fdd9afedc9df2f6ae542821fa9f11ee74879 5693 lmplayer_1.3_amd64.buildinfo
+Checksums-Sha256:
+ 0aba7696d1de8a834ac74b708c53dac6eb98f1af1d9d1dc5f96170de219d01bd 20540 lmplayer_1.3_all.deb
+ b11bca621a82d83050ef6374f8ec94d8c6656504e1141255ece9ebafbbfa5460 5693 lmplayer_1.3_amd64.buildinfo
+Files:
+ b73088e6f91b3d3abd04f0024195ad47 20540 python optional lmplayer_1.3_all.deb
+ 9b6892029f4b97e4b3ac045d84152d45 5693 python optional lmplayer_1.3_amd64.buildinfo

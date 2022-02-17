@@ -1,0 +1,10 @@
+Package: lmplayer
+Version: 1.3
+Architecture: all
+Maintainer: Mahdi Bahmani <itstorage59@gmail.com>
+Installed-Size: 90
+Depends: python3:any
+Section: python
+Priority: optional
+Homepage: https://www.itstorage.netsourcedir
+Description: lmplayer Python GTK Media Player

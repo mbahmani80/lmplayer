@@ -1,0 +1,11 @@
+[Desktop Entry] 
+Name=lmplayer1.3
+Name[fa]=ال ام پلیر
+Comment=A Python GTK program developed by Mahdi Bahmani. 
+Comment[fa]= برنامه پخش موزیک و متن شعر و ویدیو نوشته شده با پایتون و جی تی کی
+Exec=lmplayer 
+Terminal=true 
+Type=Application 
+Icon=/usr/lib/lmplayer/lmplayer.png 
+Categories=GNOME;GTK;Utility; 
+StartupNotify=false 

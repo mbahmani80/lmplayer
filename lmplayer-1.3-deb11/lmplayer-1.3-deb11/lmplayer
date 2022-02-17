@@ -1,0 +1,792 @@
+#!/usr/bin/python3
+#***********************************************************************
+#          FILES:
+#                
+#			     /usr/bin/lmplayer
+#				 
+#                /usr/lib/lmplayer/ui.glade
+#            
+#          USAGE: 
+#				 /usr/bin/lmplayer
+#				or
+#				  python3 lmplayer
+# 
+#   DESCRIPTION: 
+#
+#        OPTIONS: ---
+#   REQUIREMENTS: Python, GTK+, Glade
+#           BUGS: ---
+#          NOTES: PyGObject tutorial
+#         AUTHOR: Mahdi Bahmani (www.itstorage.ir, www.itstorage.net)
+#   ORGANIZATION: merdasco
+#        CREATED: 01.04.2021
+#    LAST EDITED: FileChooserDialog remember last path
+#       REVISION: 1.3
+#**********************************************************************/
+
+import os,sys,platform
+
+ostyps=['debian','FreeBSD','redhat','centos','ubuntu','mint']
+def os_distribution():
+	try:
+		osinfo=platform.platform()
+		print(osinfo)
+		for item in ostyps:
+			if item in osinfo:
+				return item
+	except:
+		return "N/A"
+
+OS=os_distribution()
+
+try:
+    import vlc,eyed3,gi
+except:
+	os.system("pip install python-vlc --user")
+	os.system("pip install eyed3 --user")
+	os.system("pip install PyGObject --user")
+	if OS=='debian' or OS=='ubuntu':
+		print("debian based linux")
+		# With Apt on Debian / Ubuntu:
+		os.system("sudo apt install python3-vlc python3-pip python3-gi python3-eyed3 eyed3 -y")
+		
+	if OS=='redhat' or OS=='centos':
+		print("redhat based linux")
+		# With Yum on CentOS / RHEL:
+		os.system("sudo dnf install -y pygobject3-devel.x86_64")
+		
+	if OS=='FreeBSD':
+		print("BSD based Unix")
+		os.system("sudo pkg install -y py37-pip py37-gobject3 pipeglade glade libglade2 vlc py37-eyed3")
+	print("Run again")
+	exit()
+	sys.exit()
+	
+	
+import vlc, eyed3
+from itertools import count
+from threading import Event
+import gi
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk, GLib, Gio, GObject, GdkX11, GdkPixbuf
+#gi.require_version('GdkX11', '3.0')
+
+import time, datetime
+from datetime import timedelta
+
+from multiprocessing.dummy import Pool as ThreadPool
+from os.path import basename, expanduser, isfile, join as joined
+import os.path as osp
+#-----------------------------------------------------------------------
+try:
+    unicode        # Python 2
+except NameError:
+    unicode = str  # Python 3
+
+#-----------------------------------------------------------------------
+GPLlicense="""
+					GNU GENERAL PUBLIC LICENSE
+						Version 2, June 1991
+                       
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; either version 2 of the License, or
+ (at your option) any later version.
+  
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ 
+ """
+
+ 
+########################################################################
+# ------ func_play_show_mp3_tags_info(mp3name, repeat_numbers) ------- #
+
+class Player_Class(GObject.GObject):
+
+	#filename = GObject.Property(type=str)
+	#filetype = GObject.Property(type=str, default="mp3")
+	#playlist = GObject.Property(type=widget)
+	#textbuffer1 = GObject.Property(type=Gtk.TextBuffer)
+	
+	def __init__(self):
+		
+		GObject.GObject.__init__(self)
+		#options = '--input-repeat=1'
+		self.vlcPlayer = None
+		self.media = None
+		self.media_list = None
+		self.duration = 0
+		self.played = count()
+		#self.finished = Event()
+		self.finished = 0
+		self.is_player_active = False
+		self.is_playing = False
+		self.player_paused = True
+		self.player_stoped = True
+
+		
+		
+		
+    # VLC player controls
+	#def on_setup_player(self, options):
+	def on_setup_player(self):
+		try:
+			#self.vlcInstance = vlc.Instance(options)
+			self.vlcInstance = vlc.Instance('--input-repeat=-1', '--fullscreen', '--mouse-hide-timeout=0')
+        
+		except NameError:
+			raise Exception("ERROR: VLC is not installed")
+			
+		#Create a MediaPlayer with the default instance
+		self.vlcPlayer = self.vlcInstance.media_player_new()
+		#self.vlcPlayer.set_xwindow(self.win_id)
+		self.media_list = self.vlcInstance.media_list_new()
+		self.media_list_player = self.vlcInstance.media_list_player_new()
+		self.media_list_player.set_media_player(self.vlcPlayer)
+		event_manager = self.vlcPlayer.event_manager()
+		#event_manager.event_attach(vlc.EventType.MediaPlayerEndReached, self.on_end_reached)
+		
+		event_manager.event_attach(vlc.EventType.MediaPlayerEndReached, self.SongFinished)
+		
+	
+	def on_add_media(self, filename):
+		""" Function on_play """
+		if isfile(filename):  # Creation
+			#Load the media file
+			self.media = self.vlcInstance.media_new(unicode(filename))
+			#Add the media to the player
+			self.vlcPlayer.set_media(self.media)
+			
+	def on_play(self):
+		""" Function on_play """
+		#self.vlcPlayer.is_player_active = True
+		self.player_paused = False
+		self.player_stoped = False
+		self.is_playing = True
+		self.is_player_active = True
+		self.vlcPlayer.play()
+	
+	def on_add_media_list(self,listname):
+		for i in range(len(listname)):
+			print(listname[i])
+			self.media_list.add_media(unicode(listname[i]))
+     
+	def on_play_list(self):
+		self.media_list_player.set_media_list(self.media_list)
+		self.media_list_player.play()
+#-----------------------------------------------------------------------    
+	def on_wait(self):
+		self.finished.wait()
+#-----------------------------------------------------------------------	
+	def SongFinished(self, event):
+		print ("Event reports - finished")
+		self.is_player_active = False
+		self.is_playing = False
+		self.player_paused = True
+		self.player_stoped= True
+		self.finished = 1
+#-----------------------------------------------------------------------    
+	def on_end_reached(self, event):
+		if event.type.value == vlc.EventType.MediaPlayerEndReached.value:
+			if next(self.played) == self.media_list.count():
+				self.finished.set()
+#-----------------------------------------------------------------------			
+	def on_play_mp3_show_tags_duration(self, filename,textbuffer):
+			# handle I/O error
+			rep = 0
+			try:
+
+				self.mediafiletag = eyed3.load(filename)
+				if self.mediafiletag:
+					print (self.mediafiletag.tag.artist)
+					print (self.mediafiletag.tag.album)
+					print (self.mediafiletag.tag.title)
+					# handle index error
+					try:
+						print (self.mediafiletag.tag.lyrics[0].text)
+						textbuffer.set_text("")
+						textbuffer.set_text(self.mediafiletag.tag.lyrics[0].text)
+					except IndexError:
+						print("The lyric part is empty. ...!")
+						textbuffer.set_text("The lyric part is empty. ...!")
+				else:
+					print("There is no tag information ...!")
+
+			except IOError:
+					print("I/O Error! ...")
+			except :
+				print("Unknown error occurred!...")
+				textbuffer.set_text('The lyric part is empty. ...')
+#-----------------------------------------------------------------------				
+	def on_pause(self):
+		"""Pause the player.
+		"""
+		self.is_player_active = True
+		self.is_playing = False
+		self.player_paused = True
+		self.player_stop = False
+		self.vlcPlayer.pause()
+#-----------------------------------------------------------------------
+	def on_stop(self):
+		"""Stop the player.
+		"""
+		self.is_player_active = False
+		self.is_playing = False
+		self.player_paused = True
+		self.player_stop = True
+		self.vlcPlayer.stop()
+		print("on_stop")
+	
+	def on_get_duration(self,filename):
+		mediafilelen = eyed3.load(filename)
+		self.duration = int(mediafilelen.info.time_secs)
+		#self.duration = self.mediafiletag.info.time_secs
+		#duration = self.vlcPlayer.get_length() / 1000
+		#mm, ss = divmod(duration, 60)
+		#print(ss)
+		return self.duration
+	
+	def OnTimer(self, evt):
+		"""Update the time slider according to the current movie time.
+		"""
+		# since the self.vlcPlayer.get_length can change while playing,
+		# re-set the timeslider to the correct range.
+		length = self.vlcPlayer.get_length()
+		##self.timeslider.SetRange(-1, length)
+		
+		# update the time on the slider
+		time = self.vlcPlayer.get_time()
+		##self.timeslider.SetValue(time)
+#-----------------------------------------------------------------------
+# class is used to manipulate window widgets
+class MyWindow(Gtk.Window):
+	
+	timeout_id = None
+	check_playall_state_id = None
+	current_media_name = ""
+	playrepeat = 1
+	playlist = []
+	tree_selection = None
+	elapsed_time_tmp = 1
+	total_time_tmp = 0
+	elapsed_time = "--:--"
+	total_time = "--:--"
+	is_play_all_active = False
+	last_open_dir = osp.abspath('~/')
+			
+	# Initializer function
+	def __init__(self):
+		# A Gtk.Builder is an auxiliary object that reads textual 
+		# descriptions of a user interface and instantiates the 
+		# described objects. 
+		builder = Gtk.Builder()
+		
+		# Import UI designed via Glade and connect signals
+		#builder.add_from_file('glade/25_py_mp3_player_lyrics_GUI.glade')
+		builder.add_from_file('/usr/lib/lmplayer/ui.glade')
+		builder.connect_signals(self)
+		
+		# The functions builder.get_object() can be used to access 
+		# the widgets in the interface by the names assigned to them 
+		# inside the UI description. 
+		window = builder.get_object('window1')
+		self.durationlabel1 = builder.get_object('durationlabel1')
+		self.durationlabel2 = builder.get_object('durationlabel2')
+		self.menuitem1 = builder.get_object('menuitem1')
+		self.miopen = builder.get_object('miopen')
+		self.miquit = builder.get_object('miquit')
+		self.treeview1 = builder.get_object('treeview1')
+		self.textview1 = builder.get_object('textview1')
+		self.textbuffer1 = self.textview1.get_buffer()
+		self.playpausebtn = builder.get_object('playpausebtn')
+		self.previousbtn = builder.get_object('previousbtn')
+		self.nextbtn = builder.get_object('nextbtn')
+		self.stopbtn = builder.get_object('stopbtn')
+		self.labelstatusbar = builder.get_object('labelstatusbar')
+		self.progress = builder.get_object('progress')
+		self.spinbutton1 = builder.get_object('spinbutton1')
+		self.play_image = builder.get_object('play_image')
+		self.pause_image = Gtk.Image.new_from_icon_name(
+                "gtk-media-pause",
+                Gtk.IconSize.MENU )
+		self.miabout = builder.get_object('miabout')
+		
+		self.clearlistbtn = builder.get_object('clearlistbtn')
+		self.removebtn = builder.get_object('removebtn')
+		self.playallbtn = builder.get_object('playallbtn')
+		self.updatelyricsbtn = builder.get_object('updatelyricsbtn')
+		
+		#  Set attributes
+		window.set_border_width(10)
+		window.set_size_request(600, 500)
+		window.set_title("PyGObject - LMPlayer(www.itstorage.ir)")
+
+		# tree selection
+		self.treeview1_selection = self.treeview1.get_selection()
+		
+		# Register callbacks
+		self.miopen.connect("activate", self.on_miopen_activate)
+		self.miquit.connect("activate", self.on_miquit_activate)
+		self.miabout.connect("activate", self.on_miabout_activate)
+		self.playpausebtn.connect("toggled", self.on_playpausebtn_toggled)
+		self.previousbtn.connect("clicked", self.on_previousbtn_clicked)
+		self.nextbtn.connect("clicked", self.on_nextbtn_clicked)
+		self.stopbtn.connect("clicked", self.on_stopbtn_clicked)
+		self.progress.connect("change-value",self.on_progress_change_value)
+		self.spinbutton1.connect("value-changed", self.on_spinbutton1_selected)
+		self.playallbtn.connect("clicked", self.on_playallbtn_clicked)
+		self.updatelyricsbtn.connect("clicked", self.on_updatelyricsbtn_clicked)
+		
+		# treeview
+		self.treeview1.connect("row-activated", self.on_treeview1_activated)
+		#creating the treeview columns
+		self.on_treeView_create_model_columns(self.treeview1)
+		# List rows from Tree Selection 		
+		self.treeview1_selection.connect("changed", self.on_tree_selection_changed)
+		# Clear List
+		self.clearlistbtn.connect("clicked", self.on_treeview_clearlist)
+		# Remove from list
+		self.removebtn.connect("clicked", self.on_treeview_remove_selected)
+
+		window.connect("destroy", self.on_MyWindow_destroy)
+		
+		self.spinbutton1.set_sensitive(True)
+		self.on_set_sensitive(False)
+		
+		# Create an object from C_Player Class
+		self.C_Player = Player_Class()
+		#self.C_Player.on_setup_player(self.options)
+		self.C_Player.on_setup_player()
+	
+		window.show_all()
+#-----------------------------------------------------------------------	
+	# function definition
+	def on_stop_progress_timer(self):
+		""" Stop the timer. """
+		if self.timeout_id:
+			GLib.source_remove(self.timeout_id)
+			self.timeout_id = None
+		self.progress.set_value(0)
+		self.elapsed_time_tmp = 1
+		self.total_time_tmp = 0
+		self.durationlabel2.set_text("--:--")
+		self.durationlabel1.set_text("--:--")
+		#self.playpausebtn.set_active(False)
+		self.spinbutton1.set_sensitive(True)
+		self.on_set_sensitive(False)
+		self.playpausebtn.set_image(self.play_image)
+		self.C_Player.finished = 0
+		self.C_Player.on_stop()
+#-----------------------------------------------------------------------
+	# function definition
+	def on_progress_update(self, widget, *args):
+		if not self.C_Player.vlcPlayer.is_playing:
+		#if self.C_Player.finished == 1:
+			return False # cancel timeout
+		else:
+			pos = self.progress.get_value()
+			new_pos = (pos + 100 / self.duration)
+			self.progress.set_value(new_pos)
+			if new_pos > 100:
+				self.C_Player.vlcPlayer.is_playing = False
+				self.on_stop_progress_timer()
+		return True # continue calling every x milliseconds
+#-----------------------------------------------------------------------
+	# function definition
+	def update_progress_timer(self):
+		if not self.C_Player.is_player_active:
+			self.C_Player.is_playing = False
+			self.C_Player.is_player_active = False
+			self.C_Player.player_stoped = True
+			self.on_stop_progress_timer()
+			return False # cancel timeout
+		if not self.C_Player.player_paused and self.C_Player.is_playing:
+			pos = self.progress.get_value()
+			new_pos = (pos + 100 / self.duration)
+			self.progress.set_value(new_pos)
+			
+			self.elapsed_time_tmp += 1
+			self.elapsed_time =str("{:0>8}".format(str(timedelta(seconds=int(self.elapsed_time_tmp)))))
+			self.durationlabel1.set_text(str(self.elapsed_time))
+			#if new_pos > 100 and self.total_time < 0:
+			if new_pos > 100:
+				self.C_Player.is_playing = False
+				self.C_Player.is_player_active = False
+				self.C_Player.player_stoped = True
+				self.on_stop_progress_timer()
+				print("self.progress.get_value finished")
+		return True # continue calling every x milliseconds
+#-----------------------------------------------------------------------				
+	def on_set_sensitive(self, status):
+		self.playpausebtn.set_sensitive(status)
+		self.previousbtn.set_sensitive(status)
+		self.nextbtn.set_sensitive(status)
+		self.stopbtn.set_sensitive(status)
+#-----------------------------------------------------------------------		
+	def on_progress_change_value(self, widget, scroll, value):
+		self.C_Player.vlcPlayer.set_position(value / 100)
+		self.progress.set_value(value)
+#-----------------------------------------------------------------------        
+	def on_treeView_create_model_columns(self, treeview):
+		# the data are stored in the model
+		# create a liststore with two columns
+		self.treeview1_listmodel = Gtk.ListStore(str,str)
+			
+		self.treeview1.set_model(self.treeview1_listmodel)
+		for i, column_title in enumerate(["Title", "Path"]):
+			renderer = Gtk.CellRendererText()
+			column = Gtk.TreeViewColumn(column_title, renderer, text=i)
+			column.set_clickable(True)   
+			column.set_resizable(True)
+			treeview.append_column(column)
+#-----------------------------------------------------------------------	
+	def on_add_filters(self, dialog):
+		filter_mp3 = Gtk.FileFilter()
+		filter_mp3.set_name("Media files")
+		filter_mp3.add_mime_type("audio/mp3")
+		dialog.add_filter(filter_mp3)
+	
+		filter_ply = Gtk.FileFilter()
+		filter_ply.set_name("Playlist")
+		filter_ply.add_mime_type("text/plain")
+		dialog.add_filter(filter_ply)
+	
+		filter_any = Gtk.FileFilter()
+		filter_any.set_name("Any files")
+		filter_any.add_pattern("*")
+		dialog.add_filter(filter_any)
+#-----------------------------------------------------------------------		
+	# function definition
+	def on_miabout_activate(self, event):
+		about = Gtk.AboutDialog()
+		about.set_program_name("LMPlayer")
+		about.set_name("P")
+		about.set_version("1.3")
+		about.set_copyright("(c) Mahdi Bahmani")
+		about.set_comments("LMPlayer is a Media Player\n"
+				+ "It shows Mp3 lyrics', and can play mp3 loop mode")
+		about.set_website("https://www.itstorage.net")
+		about.set_license(GPLlicense)
+		about.set_license
+		about.set_authors(["Mahdi Bahmani <itstorage59@gmail.com>"])
+		about.set_logo(GdkPixbuf.Pixbuf.new_from_file('/usr/lib/lmplayer/lmplayer.png'))
+		about.run()
+		about.destroy()
+#-----------------------------------------------------------------------        
+	# function definition
+	def on_miopen_activate(self, event):
+		# create a filechooserdialog to open:
+		open_dialog = Gtk.FileChooserDialog()
+		open_dialog.set_select_multiple(True)
+		open_dialog.set_action(Gtk.FileChooserAction.OPEN)
+		open_dialog.set_title("Open Files")
+		open_dialog.add_button('Cancel', Gtk.ResponseType.CANCEL)
+		open_dialog.add_button('Open', Gtk.ResponseType.OK)
+		open_dialog.set_current_folder(self.last_open_dir)
+		self.on_add_filters(open_dialog)
+		
+		# not only local files can be selected in the file selector
+		open_dialog.set_local_only(False)
+		# dialog always on top of the textview window
+		open_dialog.set_modal(True)
+		# connect the dialog with the callback function open_response_cb()
+		open_dialog.connect("response", self.open_response_cb)
+		# show the dialog
+		open_dialog.show()
+#-----------------------------------------------------------------------
+	# callback function for the dialog open_dialog
+	def open_response_cb(self, dialog, response_id):
+		open_dialog = dialog
+		# if response is "ACCEPT" (the button "Open" has been clicked)
+		if response_id == Gtk.ResponseType.OK:
+			 
+			# self.filelists are the files that we get from the FileChooserDialog
+			self.filelists = sorted(open_dialog.get_filenames())
+			self.last_open_dir = open_dialog.get_current_folder()
+			for i in range(len(self.filelists)):
+				mp3name=os.path.basename(self.filelists[i])
+				basename=os.path.dirname(self.filelists[i])
+				# append to the model the title that is in the entry
+				self.treeview1_listmodel.append([mp3name,basename])
+
+		# if response is "CANCEL" (the button "Cancel" has been clicked)
+		elif response_id == Gtk.ResponseType.CANCEL:
+			print("cancelled: FileChooserAction.OPEN")
+		# destroy the FileChooserDialog
+		dialog.destroy()
+#-----------------------------------------------------------------------		 
+	def on_treeview1_activated(self, widget, row, col):
+		model = widget.get_model()
+		self.current_media_name = model[row][1] + "/" + model[row][0]
+		self.labelstatusbar.set_text(model[row][0])	
+		#print(self.current_media_name)
+		self.on_call_other_function_to_play(self.current_media_name)
+#-----------------------------------------------------------------------
+	def on_call_other_function_to_play(self, media_name):
+		self.on_stop_progress_timer()
+		self.C_Player.on_add_media(media_name)
+		self.C_Player.on_play_mp3_show_tags_duration(media_name, self.textbuffer1)
+		self.duration = self.C_Player.on_get_duration(media_name)
+		#self.on_stop_progress_timer()
+		self.C_Player.on_play()
+		
+		#self.playpausebtn.set_active(False)
+		self.on_set_sensitive(True)
+		self.playpausebtn.set_image(self.pause_image)
+		
+		self.total_time_tmp = int(self.C_Player.on_get_duration(media_name))
+		self.total_time = str("{:0>8}".format(str(timedelta(seconds=int(self.total_time_tmp)))))
+		
+		self.durationlabel1.set_text(str(self.elapsed_time))
+		self.durationlabel2.set_text(str(self.total_time))
+		if not self.timeout_id:
+			# time out will check every 1000 miliseconds (every 1 second)
+			self.timeout_id = GLib.timeout_add(1000, self.update_progress_timer)
+#-----------------------------------------------------------------------		
+	def on_playpausebtn_toggled(self, widget, *args):
+		print("on_playpausebtn_toggled")
+		"""
+        Handler for Player's Playback Button (Play/Pause).
+        """
+		if self.playpausebtn.get_active():
+			self.playpausebtn.set_image(self.play_image)
+			self.C_Player.is_player_active = True
+			self.C_Player.is_playing = False
+			self.C_Player.player_paused = True
+			self.C_Player.on_pause()
+			
+		elif not self.playpausebtn.get_active():
+			self.playpausebtn.set_image(self.pause_image)
+			self.C_Player.is_player_active = True
+			self.C_Player.is_playing = True
+			self.C_Player.player_paused = False
+			self.C_Player.on_play()
+			
+		#self.timeout_id = GLib.timeout_add(1000, self.update_progress_timer)
+#-----------------------------------------------------------------------
+	# function definition
+	def on_stop_playall(self):
+		""" Stop the timer. """
+		if self.check_playall_state_id:
+			GLib.source_remove(self.check_playall_state_id)
+			self.check_playall_state_id = None
+		self.C_Player.finished = 0
+		self.index = 0
+#-----------------------------------------------------------------------
+	def on_check_playall_main_loop_state(self):
+		
+		#print ("self.index=",self.index ,"self.max_index=", self.max_index )
+		#if self.index > self.max_index-1:
+		if not self.is_play_all_active:
+			self.on_stop_playall()
+			return False
+			
+		
+		if self.index < self.max_index-1:	
+			#if self.C_Player.finished == 1:
+			if self.C_Player.player_stoped:
+				self.index += 1
+				print(self.index)
+				try:		
+					# Get path pointing to 6th row in list store
+					self.path = Gtk.TreePath(self.index)
+					self.treeiter = self.treeview1_listmodel.get_iter(self.path)
+					self.treeview1.set_cursor(self.path)
+					# Get value of all columns
+					self.value1 = self.treeview1_listmodel.get_value(self.treeiter, 0)
+					self.value2 = self.treeview1_listmodel.get_value(self.treeiter, 1)
+					self.current_media_name = self.value2+"/"+self.value1
+					print (self.current_media_name)
+					self.labelstatusbar.set_text(self.value1)
+					self.C_Player.finished == 0
+					self.on_call_other_function_to_play(self.current_media_name)
+					#self.C_Player.on_play()
+				except IndexError:
+					print("Play List finished")
+		else:
+			self.is_play_all_active = False
+			#	self.on_stop_progress_timer()
+		return True # continue calling every x milliseconds
+#-----------------------------------------------------------------------	
+	def on_playallbtn_clicked(self, widget):
+		print("on_playallbtn_clicked")
+		self.is_play_all_active = True
+		self.on_stop_progress_timer()
+		self.on_stop_playall()
+		self.C_Player.finished = 0
+		self.index = 0
+		self.max_index = len(self.treeview1_listmodel)
+		if self.max_index != 0:
+			if self.index < self.max_index:
+				# Get path pointing to 6th row in list store
+				self.path = Gtk.TreePath(self.index)
+				self.treeiter = self.treeview1_listmodel.get_iter(self.path)
+				self.treeview1.set_cursor(self.path)
+				# Get value of all columns
+				self.value1 = self.treeview1_listmodel.get_value(self.treeiter, 0)
+				self.value2 = self.treeview1_listmodel.get_value(self.treeiter, 1)
+				self.current_media_name = self.value2+"/"+self.value1
+				print (self.current_media_name)
+	
+				self.labelstatusbar.set_text(self.value1)
+				self.on_call_other_function_to_play(self.current_media_name)
+			# time out will check every 1000 miliseconds (every 1 second)
+			self.check_playall_state_id = GLib.timeout_add(1000, self.on_check_playall_main_loop_state)
+
+		else:
+			print("Empty list")
+#-----------------------------------------------------------------------
+	def on_treeview_clearlist(self, widget):
+		print("on_treeview_clearlist")
+		 # if there is still an entry in the model
+		if len(self.treeview1_listmodel) != 0:
+			model = self.treeview1.get_model()
+			model.clear()	
+		# else, if there are no entries in the model, print "Empty list"
+		# in the terminal
+		else:
+			print("Empty list")
+#-----------------------------------------------------------------------	
+	def on_treeview_remove_selected(self, widget):
+		# if there is still an entry in the model
+		if len(self.treeview1_listmodel) != 0:
+			(model, pathlist) = self.treeview1_selection.get_selected_rows()
+			for p in reversed(pathlist):
+				itr = model.get_iter(p)
+				model.remove(itr)
+			self.max_index = len(self.treeview1_listmodel)
+		# else, if there are no entries in the model, print "Empty list"
+        # in the terminal
+		else:
+			print("Empty list")
+#-----------------------------------------------------------------------				
+	# function definition
+	def on_tree_selection_changed(self, tree_selection):
+		print("on_tree_selection_changed")
+		(model, pathlist) = tree_selection.get_selected_rows()
+		for path in pathlist :
+			tree_iter = model.get_iter(path)
+			value = model.get_value(tree_iter,0)
+			print (value)
+#-----------------------------------------------------------------------			
+	def on_previousbtn_clicked(self, widget, *args):
+		print("on_previousbtn_clicked")
+		self.on_stop_progress_timer()   
+		self.on_stop_playall()
+		#get the selected row, and just return if none are selected
+		cmodel, crow = self.treeview1_selection.get_selected_rows()
+		if len(crow) == 0:
+		   return
+		
+		# calculate the next row to be selected by finding
+		# the last selected row in the list of selected rows
+		previous_to_select = crow[-1][0]
+		
+		#if this is not the last row in the last
+		#unselect all rows, select the previous row
+		if previous_to_select:
+			# Decrementing by 1
+			previous_to_select = crow[-1][0] - 1
+			self.treeview1_selection.unselect_all()
+			self.treeview1_selection.select_path(previous_to_select)
+			model, row = self.treeview1_selection.get_selected_rows()
+			self.current_media_name = model[row][1] + "/" + model[row][0]
+			self.labelstatusbar.set_text(model[row][0])	
+			self.on_call_other_function_to_play(self.current_media_name)
+			print(self.current_media_name)
+			
+#-----------------------------------------------------------------------	
+	def on_nextbtn_clicked(self, widget, *args):
+		print("on_nextbtn_clicked")
+		self.on_stop_progress_timer()   
+		self.on_stop_playall()
+		#get the selected row, and just return if none are selected
+		cmodel, crow = self.treeview1_selection.get_selected_rows()
+		if len(crow) == 0:
+		   return
+		
+		# calculate the next row to be selected by finding
+		# the last selected row in the list of selected rows
+		# Incrementing by 1
+		next_to_select = crow[-1][0] + 1
+		
+		#if this is not the last row in the last
+		#unselect all rows, select the previous row
+		if next_to_select:
+			self.treeview1_selection.unselect_all()
+			self.treeview1_selection.select_path(next_to_select)
+			try:
+				model, row = self.treeview1_selection.get_selected_rows()
+				if row[-1][0]:
+					self.current_media_name = model[row][1] + "/" + model[row][0]
+					print (self.current_media_name)
+					self.labelstatusbar.set_text(model[row][0])	
+					self.on_call_other_function_to_play(self.current_media_name)
+					print(self.current_media_name)
+			except IndexError:
+				print("End of play list")
+		
+#-----------------------------------------------------------------------
+	def on_stopbtn_clicked(self, widget):
+		self.on_stop_progress_timer()   
+		self.on_stop_playall()
+#-----------------------------------------------------------------------	
+	def on_updatelyricsbtn_clicked(self, widget, *args):
+		print("on_updatelyricsbtn_clicked")
+		self.on_stop_progress_timer()   
+		self.on_stop_playall()
+		#get the selected row, and just return if none are selected
+		model, row = self.treeview1_selection.get_selected_rows()
+		if len(row) == 0:
+		   return
+		self.current_media_name = model[row][1] + "/" + model[row][0]
+		print (self.current_media_name)
+		self.labelstatusbar.set_text(model[row][0])	
+		#self.on_call_other_function_to_play(self.current_media_name)
+		start_iter = self.textbuffer1.get_start_iter()
+		end_iter = self.textbuffer1.get_end_iter()
+		text = self.textbuffer1.get_text(start_iter, end_iter, True)   
+		with open("/tmp/k.txt", 'x') as f:
+			f.write(text)
+
+		bashCommand0 = "eyeD3 --remove-all" + "  " + self.current_media_name 
+		bashCommand = "eyeD3 --encoding utf8 --add-lyrics /tmp/k.txt "+ "  " + self.current_media_name 
+		print(bashCommand0)
+		print(bashCommand)
+		os.system(bashCommand0)
+		os.system(bashCommand)
+		os.remove("/tmp/k.txt")
+		print(self.current_media_name)
+					
+		
+#-----------------------------------------------------------------------	
+	def on_spinbutton1_selected(self, widget, *args):
+		svalue = str(self.spinbutton1.get_value_as_int())
+		self.playrepeat = svalue
+		self.C_Player.on_stop()
+#-----------------------------------------------------------------------			
+	# function definition	
+	def on_miquit_activate(self, widget, *args):
+		Gtk.main_quit()
+#-----------------------------------------------------------------------
+	# function definition
+	def on_MyWindow_destroy(self, widget, *args):
+		""" Handles destroy event of main window. """
+		self.C_Player.on_stop()
+		self.on_stop_progress_timer()
+		Gtk.main_quit()
+#-----------------------------------------------------------------------
+# main function
+def main():
+	
+	window = MyWindow()
+	
+	# GTK main loop
+	Gtk.main()
+#-----------------------------------------------------------------------
+		
+if __name__ == '__main__':
+    main()
